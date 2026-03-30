@@ -2,11 +2,14 @@ package moph
 
 import "log"
 
+// CreateAppointment สร้างนัดหมายผู้ป่วยใน MOPH API
 func CreateAppointment(p Patient, clinicID, roomID, slotID string) error {
+	// ตรวจสอบและจัดการเบอร์โทรที่เป็นค่าว่าง
 	tel := cleanTel(p.Tel)
 	if tel == "" {
-		tel = "0000000000"
+		tel = "0000000000" // ใช้ค่า default ถ้าไม่มีเบอร์โทร
 	}
+	// สร้าง request body สำหรับ MOPH API
 	body := map[string]any{
 		"cid":                p.CID,
 		"title_name":         p.PName,
@@ -24,10 +27,12 @@ func CreateAppointment(p Patient, clinicID, roomID, slotID string) error {
 		"appointment_mode":   "walkin",
 		"appointment_status": "อนุมัติ",
 	}
+	// ส่ง request ไปสร้าง appointment
 	res, err := post("/open-api/appointment/create", body)
 	if err != nil {
 		return err
 	}
+	// แสดงผลลัพธ์การสร้าง appointment
 	log.Printf("  appointment %s %s %s → %v", p.PName, p.FName, p.LName, res["message"])
 	return nil
 }

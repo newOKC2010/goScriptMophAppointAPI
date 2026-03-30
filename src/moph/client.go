@@ -7,13 +7,21 @@ import (
 	"net/http"
 )
 
-var baseURL, clientKey, secretKey string
+// ตัวแปร global สำหรับเก็บ config ของ MOPH API
+var (
+	baseURL   string // URL ของ MOPH API
+	clientKey string // Client key สำหรับ authentication
+	secretKey string // Secret key สำหรับ authentication
+)
 
+// Init ตั้งค่า MOPH API client ด้วย URL และ authentication keys
 func Init(url, ck, sk string) {
 	baseURL, clientKey, secretKey = url, ck, sk
 }
 
+// post ส่ง HTTP POST request ไปยัง MOPH API พร้อม authentication headers
 func post(path string, body any) (map[string]any, error) {
+	// ถ้า body เป็น nil ให้ใช้ empty object แทน
 	if body == nil {
 		body = map[string]any{}
 	}

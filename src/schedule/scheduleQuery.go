@@ -2,7 +2,6 @@ package schedule
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"time"
 
@@ -10,11 +9,7 @@ import (
 	"go-script-moph-appoint/src/moph"
 )
 
-type ClinicCount struct {
-	Name  string
-	Total int
-}
-
+// isHoliday ตรวจสอบว่าวันที่กำหนดเป็นวันหยุดหรือไม่
 func isHoliday(db *sql.DB, date string) bool {
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM holiday WHERE holiday_date = $1", date).Scan(&count)
@@ -25,23 +20,27 @@ func isHoliday(db *sql.DB, date string) bool {
 	return count > 0
 }
 
+// queryClinicCount ดึงข้อมูลจำนวนนัดหมายของทุกคลินิก แล้ววนลูปสร้าง schedule และ appointment ในแต่ละคลินิก
 func queryClinicCount(db *sql.DB) {
+	// อ่านวันที่เป้าหมายจาก env หรือใช้วันพรุ่งนี้
 	targetDate := loadenv.LoadDateCount()
 	if targetDate == "" {
 		targetDate = time.Now().AddDate(0, 0, 1).Format("2006-01-02")
 	}
 
+	// ตรวจสอบว่าเป็นวันหยุดหรือไม่
 	if isHoliday(db, targetDate) {
 		log.Printf("⚠️  วันที่ %s ตรงกับวันหยุด ข้ามการประมวลผล", targetDate)
 		return
 	}
 
+	// ⚠️  หากเพิ่ม/ลด clinic ต้องแก้ส่วน IN(...) ด้านล่างให้ตรงกับ clinicMap ด้านบน
 	rows, err := db.Query(`
-		SELECT c.name, COUNT(o.vn) AS total
+		SELECT o.clinic, c.name, COUNT(o.vn) AS total
 		FROM oapp o
 		LEFT JOIN clinic c ON c.clinic = o.clinic
 		WHERE o.nextdate = $1
-		AND c.clinic IN('031','002','001','027')
+		AND o.clinic IN('031','002','001','027')
 		GROUP BY o.clinic, c.name
 		ORDER BY total DESC`, targetDate)
 	if err != nil {
@@ -50,21 +49,24 @@ func queryClinicCount(db *sql.DB) {
 	}
 	defer rows.Close()
 
+	// เก็บผลลัพธ์ใน slice
 	var results []ClinicCount
 	for rows.Next() {
 		var c ClinicCount
-		if err := rows.Scan(&c.Name, &c.Total); err != nil {
+		if err := rows.Scan(&c.Code, &c.Name, &c.Total); err != nil {
 			log.Println("scan error:", err)
 			continue
 		}
 		results = append(results, c)
 	}
 
+	// คำนวณยอดรวมทั้งหมด
 	grandTotal := 0
 	for _, c := range results {
 		grandTotal += c.Total
 	}
 
+	// แสดงรายงานสรุปในรูปแบบตาราง
 	log.Println("┌─────────────────────────────────────────────────┐")
 	log.Printf("│  รายงานนัดหมายวันที่ : %-26s│", targetDate)
 	log.Printf("│  ประมวลผลเมื่อ       : %-26s│", time.Now().Format("2006-01-02 15:04:05"))
@@ -78,20 +80,34 @@ func queryClinicCount(db *sql.DB) {
 	log.Printf("│  รวมทั้งหมด                        │ %10d   │", grandTotal)
 	log.Println("└───────────────────────────────────┴──────────────┘")
 
-	patients := queryPatients(db, targetDate)
-	clinicID := "69c4d4ecaf6b65ba386b4ce8"
-	roomID := "69c4d62b94822eb80329d454"
-	moph.Run(patients, clinicID, roomID, targetDate)
+	// วนลูปแต่ละคลินิก เพื่อสร้าง schedule และ appointment
+	for _, c := range results {
+		// หา config ของคลินิกจาก map
+		cfg, ok := clinicMap[c.Code]
+		if !ok {
+			log.Printf("ไม่พบ config สำหรับ clinic %s", c.Code)
+			continue
+		}
+		// แสดง separator และชื่อคลินิก
+		log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		log.Printf("คลินิก: %s  จำนวน: %d", c.Name, c.Total)
+		log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		// ดึงข้อมูลผู้ป่วยของคลินิกนี้
+		patients := queryPatients(db, targetDate, c.Code)
+		// เรียก moph.Run เพื่อสร้าง schedule และ appointment
+		moph.Run(patients, cfg.ClinicID, cfg.RoomID, targetDate)
+	}
 }
 
-func queryPatients(db *sql.DB, date string) []moph.Patient {
+// queryPatients ดึงข้อมูลผู้ป่วยที่มีนัดหมายในวันและคลินิกที่กำหนด
+func queryPatients(db *sql.DB, date, clinicCode string) []moph.Patient {
 	rows, err := db.Query(`
 		SELECT p.cid, p.pname, p.fname, p.lname,
 		       TO_CHAR(p.birthday, 'YYYY-MM-DD'), p.sex, COALESCE(p.informtel,'')
 		FROM oapp o
 		LEFT JOIN patient p ON p.hn = o.hn
 		WHERE o.nextdate = $1
-		AND o.clinic = '002'`, date)
+		AND o.clinic = $2`, date, clinicCode)
 	if err != nil {
 		log.Println("query patients error:", err)
 		return nil
@@ -108,29 +124,4 @@ func queryPatients(db *sql.DB, date string) []moph.Patient {
 		patients = append(patients, p)
 	}
 	return patients
-}
-
-func Start(db *sql.DB, scheduleTime string) {
-	nextRun := nextRunTime(scheduleTime)
-	log.Printf("เวลาที่เริ่มประมวลผลของทุกวัน %s", nextRun.Format("15:04:05"))
-
-	go func() {
-		for {
-			time.Sleep(time.Until(nextRun))
-			queryClinicCount(db)
-			nextRun = nextRun.Add(24 * time.Hour)
-			log.Printf("waiting for next run...")
-		}
-	}()
-}
-
-func nextRunTime(t string) time.Time {
-	now := time.Now()
-	var h, m int
-	fmt.Sscanf(t, "%d:%d", &h, &m)
-	next := time.Date(now.Year(), now.Month(), now.Day(), h, m, 0, 0, now.Location())
-	if next.Before(now) {
-		next = next.Add(24 * time.Hour)
-	}
-	return next
 }
