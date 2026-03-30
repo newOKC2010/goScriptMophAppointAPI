@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  moph-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: moph-appointment-scheduler
+    container_name: moph-appointment-scheduler
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./.env:/app/.env:ro
+    environment:
+      - TZ=Asia/Bangkok
+    # ไม่ต้อง expose port เพราะเป็น scheduler ไม่มี HTTP server
+    # เชื่อมต่อ database ผ่าน DB_URL ใน .env

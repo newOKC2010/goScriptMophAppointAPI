@@ -1,0 +1,30 @@
+# Environment files
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+*.md
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+
+# Test files
+*_test.go
+
+# Build artifacts
+server
+*.exe

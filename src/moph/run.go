@@ -23,6 +23,11 @@ func Run(patients []Patient, clinicID, roomID, targetDate string) {
 	// วนลูปสร้าง appointment สำหรับผู้ป่วยแต่ละคน
 	for i, p := range patients {
 		log.Printf("  [%d/%d] %s %s %s", i+1, len(patients), p.PName, p.FName, p.LName)
+		// ข้ามผู้ป่วยที่ข้อมูล CID หรือวันเกิดไม่ครบ (จะทำให้ MOPH API error)
+		if p.CID == "" || p.Birthday == "" {
+			log.Printf("  ⚠️  ข้าม: ข้อมูลไม่ครบ (cid=%q, birthday=%q)", p.CID, p.Birthday)
+			continue
+		}
 		if err := CreateAppointment(p, clinicID, roomID, scheduleID); err != nil {
 			log.Printf("  appointment error: %v", err)
 		}

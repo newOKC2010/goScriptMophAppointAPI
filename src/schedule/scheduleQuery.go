@@ -39,8 +39,11 @@ func queryClinicCount(db *sql.DB) {
 		SELECT o.clinic, c.name, COUNT(o.vn) AS total
 		FROM oapp o
 		LEFT JOIN clinic c ON c.clinic = o.clinic
+		LEFT JOIN patient p ON p.hn = o.hn
 		WHERE o.nextdate = $1
 		AND o.clinic IN('031','002','001','027')
+		AND p.nationality = '99'
+		AND p.citizenship = '99'
 		GROUP BY o.clinic, c.name
 		ORDER BY total DESC`, targetDate)
 	if err != nil {
@@ -99,7 +102,7 @@ func queryClinicCount(db *sql.DB) {
 	}
 }
 
-// queryPatients ดึงข้อมูลผู้ป่วยที่มีนัดหมายในวันและคลินิกที่กำหนด
+// queryPatients ดึงข้อมูลผู้ป่วยที่มีนัดหมายในวันและคลินิกที่กำหนด (เฉพาะคนไทย)
 func queryPatients(db *sql.DB, date, clinicCode string) []moph.Patient {
 	rows, err := db.Query(`
 		SELECT p.cid, p.pname, p.fname, p.lname,
@@ -107,7 +110,9 @@ func queryPatients(db *sql.DB, date, clinicCode string) []moph.Patient {
 		FROM oapp o
 		LEFT JOIN patient p ON p.hn = o.hn
 		WHERE o.nextdate = $1
-		AND o.clinic = $2`, date, clinicCode)
+		AND o.clinic = $2
+		AND p.nationality = '99'
+		AND p.citizenship = '99'`, date, clinicCode)
 	if err != nil {
 		log.Println("query patients error:", err)
 		return nil
