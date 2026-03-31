@@ -28,6 +28,11 @@ func Run(patients []Patient, clinicID, roomID, targetDate string) {
 			log.Printf("  ⚠️  ข้าม: ข้อมูลไม่ครบ (cid=%q, birthday=%q)", p.CID, p.Birthday)
 			continue
 		}
+		// ตรวจสอบ CID ต้องเป็นตัวเลข 13 หลักเท่านั้น
+		if len(p.CID) != 13 {
+			log.Printf("  ⚠️  ข้าม: CID ไม่ใช่ 13 หลัก (cid=%q)", p.CID)
+			continue
+		}
 		if err := CreateAppointment(p, clinicID, roomID, scheduleID); err != nil {
 			log.Printf("  appointment error: %v", err)
 		}

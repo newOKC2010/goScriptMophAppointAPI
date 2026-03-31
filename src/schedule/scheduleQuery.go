@@ -39,7 +39,7 @@ func queryClinicCount(db *sql.DB) {
 		SELECT o.clinic, c.name, COUNT(o.vn) AS total
 		FROM oapp o
 		LEFT JOIN clinic c ON c.clinic = o.clinic
-		LEFT JOIN patient p ON p.hn = o.hn
+		INNER JOIN patient p ON p.hn = o.hn
 		WHERE o.nextdate = $1
 		AND o.clinic IN('031','002','001','027')
 		AND p.nationality = '99'
@@ -106,9 +106,9 @@ func queryClinicCount(db *sql.DB) {
 func queryPatients(db *sql.DB, date, clinicCode string) []moph.Patient {
 	rows, err := db.Query(`
 		SELECT p.cid, p.pname, p.fname, p.lname,
-		       TO_CHAR(p.birthday, 'YYYY-MM-DD'), p.sex, COALESCE(p.informtel,'')
+		       COALESCE(TO_CHAR(p.birthday, 'YYYY-MM-DD'), ''), p.sex, COALESCE(p.informtel,'')
 		FROM oapp o
-		LEFT JOIN patient p ON p.hn = o.hn
+		INNER JOIN patient p ON p.hn = o.hn
 		WHERE o.nextdate = $1
 		AND o.clinic = $2
 		AND p.nationality = '99'
