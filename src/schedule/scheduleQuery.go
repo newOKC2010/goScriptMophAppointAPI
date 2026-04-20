@@ -41,7 +41,7 @@ func queryClinicCount(db *sql.DB) {
 		LEFT JOIN clinic c ON c.clinic = o.clinic
 		INNER JOIN patient p ON p.hn = o.hn
 		WHERE o.nextdate = $1
-		AND o.clinic IN('031','002','001','027')
+		AND o.clinic IN('031','002','001','027','041')
 		AND p.nationality = '99'
 		AND p.citizenship = '99'
 		GROUP BY o.clinic, c.name
